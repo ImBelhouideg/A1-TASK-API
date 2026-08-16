@@ -1,13 +1,16 @@
 {
   "name": "a1-task-api",
   "version": "1.0.0",
-  "description": "A1 - CRUD Task API (in-memory) with Swagger UI",
+  "description": "A1 - CRUD Task API (in-memory) with Swagger UI, plus A17 LLM enrich endpoint",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "openai": "^4.56.0",
+    "zod": "^3.23.8",
+    "dotenv": "^16.4.5"
   }
 }
