@@ -3,6 +3,7 @@ const swaggerUi = require('swagger-ui-express');
 const openapiSpec = require('./openapi.json');
 const { EnrichInputSchema } = require('./src/llm/schema');
 const { stubEnrichResponse } = require('./src/llm/stub');
+const { callModelForEnrich } = require('./src/llm/enrich');
 
 const app = express();
 app.use(express.json());
@@ -73,7 +74,7 @@ app.delete('/tasks/:id', (req, res) => {
   res.status(204).end();
 });
 
-app.post('/enrich', (req, res) => {
+app.post('/enrich', async (req, res) => {
   const parseResult = EnrichInputSchema.safeParse(req.body || {});
   if (!parseResult.success) {
     const issue = parseResult.error.issues[0];
@@ -85,8 +86,10 @@ app.post('/enrich', (req, res) => {
     return res.status(200).json(stubEnrichResponse(title));
   }
 
-  // Stage 2 branchera le vrai appel modèle ici.
-  return res.status(501).json({ error: 'Real model call not implemented yet (Stage 2)' });
+  // Stage 2: real model call, raw text for now — Stage 3 adds
+  // parsing + schema validation before this ever reaches the caller.
+  const rawText = await callModelForEnrich(title);
+  return res.status(200).send(rawText);
 });
 
 // --- Stage 5: Swagger UI ---
