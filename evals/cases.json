@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "title": "Fix login crash on iOS",
+    "expected_category": "bug",
+    "expected_priority": "high",
+    "note": "clear, typical bug report"
+  },
+  {
+    "id": 2,
+    "title": "Update README with setup instructions",
+    "expected_category": "docs",
+    "expected_priority": "low",
+    "note": "clear documentation task"
+  },
+  {
+    "id": 3,
+    "title": "Add dark mode toggle to settings",
+    "expected_category": "feature",
+    "expected_priority": "medium",
+    "note": "clear feature request"
+  },
+  {
+    "id": 4,
+    "title": "Refactor database connection pooling for better performance",
+    "expected_category": "chore",
+    "expected_priority": "medium",
+    "note": "internal improvement, not user-facing"
+  },
+  {
+    "id": 5,
+    "title": "App crashes when uploading a file larger than 10MB",
+    "expected_category": "bug",
+    "expected_priority": "high",
+    "note": "clear bug, specific reproduction condition"
+  },
+  {
+    "id": 6,
+    "title": "Write API documentation for the /enrich endpoint",
+    "expected_category": "docs",
+    "expected_priority": "low",
+    "note": "clear documentation task"
+  },
+  {
+    "id": 7,
+    "title": "Look into that thing from the meeting",
+    "expected_category": "other",
+    "expected_priority": "medium",
+    "note": "ambiguous on purpose - should hit the when-unsure rule, low confidence expected"
+  },
+  {
+    "id": 8,
+    "title": "asdkjfh",
+    "expected_category": "other",
+    "expected_priority": "medium",
+    "note": "garbage input - should hit the when-unsure rule, not a confident guess"
+  }
+]
