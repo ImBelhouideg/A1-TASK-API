@@ -4,6 +4,8 @@ const { client } = require("./client");
 const { extractJsonText, tryParseJson } = require("./parse");
 const { EnrichOutputSchema } = require("./schema");
 const { logToQuarantine } = require("./quarantine");
+const { withRetry, isTimeoutError } = require("./retry");
+const { logCost } = require("./costLog");
 
 const PROMPT_VERSION = "enrich-task-v1";
 const SYSTEM_PROMPT = fs.readFileSync(
@@ -12,31 +14,57 @@ const SYSTEM_PROMPT = fs.readFileSync(
 );
 
 async function callModelForEnrich(title) {
-  const response = await client.chat.completions.create({
+  const start = Date.now();
+  const response = await withRetry(() =>
+    client.chat.completions.create({
+      model: process.env.LLM_MODEL,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: JSON.stringify({ title }) },
+      ],
+    })
+  );
+  const durationMs = Date.now() - start;
+
+  logCost({
+    promptVersion: PROMPT_VERSION,
     model: process.env.LLM_MODEL,
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: JSON.stringify({ title }) },
-    ],
+    inputTokens: response.usage?.prompt_tokens ?? null,
+    outputTokens: response.usage?.completion_tokens ?? null,
+    durationMs,
+    repaired: false,
   });
 
   return response.choices[0].message.content;
 }
 
 async function callModelForRepair(title, brokenOutput, errorMessage) {
-  const response = await client.chat.completions.create({
+  const start = Date.now();
+  const response = await withRetry(() =>
+    client.chat.completions.create({
+      model: process.env.LLM_MODEL,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: JSON.stringify({ title }) },
+        { role: "assistant", content: brokenOutput || "" },
+        {
+          role: "user",
+          content: `Your previous answer was rejected for this reason: ${errorMessage}. Return only corrected JSON matching the schema.`,
+        },
+      ],
+    })
+  );
+  const durationMs = Date.now() - start;
+
+  logCost({
+    promptVersion: PROMPT_VERSION,
     model: process.env.LLM_MODEL,
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: JSON.stringify({ title }) },
-      { role: "assistant", content: brokenOutput || "" },
-      {
-        role: "user",
-        content: `Your previous answer was rejected for this reason: ${errorMessage}. Return only corrected JSON matching the schema.`,
-      },
-    ],
+    inputTokens: response.usage?.prompt_tokens ?? null,
+    outputTokens: response.usage?.completion_tokens ?? null,
+    durationMs,
+    repaired: true,
   });
 
   return response.choices[0].message.content;
@@ -66,16 +94,36 @@ function parseAndValidate(rawText) {
 }
 
 async function enrichTask(title) {
-  const firstRaw = await callModelForEnrich(title);
-  const firstResult = parseAndValidate(firstRaw);
+  let firstRaw;
+  try {
+    firstRaw = await callModelForEnrich(title);
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      const timeoutErr = new Error("Model call timed out");
+      timeoutErr.isTimeout = true;
+      throw timeoutErr;
+    }
+    throw err;
+  }
 
+  const firstResult = parseAndValidate(firstRaw);
   if (firstResult.success) {
     return { success: true, data: firstResult.data, repaired: false };
   }
 
-  const repairRaw = await callModelForRepair(title, firstRaw, firstResult.error);
-  const repairResult = parseAndValidate(repairRaw);
+  let repairRaw;
+  try {
+    repairRaw = await callModelForRepair(title, firstRaw, firstResult.error);
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      const timeoutErr = new Error("Model call timed out during repair");
+      timeoutErr.isTimeout = true;
+      throw timeoutErr;
+    }
+    throw err;
+  }
 
+  const repairResult = parseAndValidate(repairRaw);
   if (repairResult.success) {
     return { success: true, data: repairResult.data, repaired: true };
   }

@@ -73,7 +73,6 @@ app.delete('/tasks/:id', (req, res) => {
   res.status(204).end();
 });
 
-
 app.post('/enrich', async (req, res) => {
   const parseResult = EnrichInputSchema.safeParse(req.body || {});
   if (!parseResult.success) {
@@ -82,16 +81,28 @@ app.post('/enrich', async (req, res) => {
   }
   const { title } = parseResult.data;
 
+  if (process.env.LLM_ENABLED === 'false') {
+    return res.status(503).json({ error: 'The enrich feature is currently disabled' });
+  }
+
   if (process.env.LLM_STUB === '1') {
     return res.status(200).json(stubEnrichResponse(title));
   }
 
-  const result = await enrichTask(title);
-  if (!result.success) {
-    return res.status(422).json({ error: result.error });
+  try {
+    const result = await enrichTask(title);
+    if (!result.success) {
+      return res.status(422).json({ error: result.error });
+    }
+    return res.status(200).json(result.data);
+  } catch (err) {
+    if (err.isTimeout) {
+      return res.status(504).json({ error: 'The model took too long to respond' });
+    }
+    return res.status(502).json({ error: `Model call failed: ${err.message}` });
   }
-  return res.status(200).json(result.data);
 });
+
 // --- Stage 5: Swagger UI ---
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
